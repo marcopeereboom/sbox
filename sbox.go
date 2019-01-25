@@ -19,7 +19,7 @@ var (
 	magic    = []byte{'s', 'b', 'o', 'x'} // magic prefix for packed blobs
 	magicLen = len(magic)                 // length of the magix prefix
 
-	ErrInvalidHeader   = errors.New("invalid sboz header")
+	ErrInvalidHeader   = errors.New("invalid sbox header")
 	ErrInvalidMagic    = errors.New("invalid magic")
 	ErrCouldNotDecrypt = errors.New("could not decrypt")
 )
