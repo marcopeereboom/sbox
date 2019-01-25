@@ -19,8 +19,14 @@ var (
 	magic    = []byte{'s', 'b', 'o', 'x'} // magic prefix for packed blobs
 	magicLen = len(magic)                 // length of the magix prefix
 
-	ErrInvalidHeader   = errors.New("invalid sbox header")
-	ErrInvalidMagic    = errors.New("invalid magic")
+	// ErrInvalidHeader is returned when the header is too short.
+	ErrInvalidHeader = errors.New("invalid sbox header")
+
+	// ErrInvalidMagic is returned is the header does not start with magic
+	// prefix.
+	ErrInvalidMagic = errors.New("invalid magic")
+
+	// ErrCouldNotDecrypt is returned when the secret box decryption fails.
 	ErrCouldNotDecrypt = errors.New("could not decrypt")
 )
 
