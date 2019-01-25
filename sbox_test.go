@@ -64,7 +64,7 @@ func TestEncryptDecryptCorruptHeader(t *testing.T) {
 
 	// corrupt magic
 	encrypted[0] = 0
-	decrypted, version, err = Decrypt(key, encrypted)
+	_, _, err = Decrypt(key, encrypted)
 	if err != ErrInvalidMagic {
 		t.Fatal(err)
 	}
@@ -76,7 +76,7 @@ func TestEncryptDecryptCorruptHeader(t *testing.T) {
 	x := encrypted[offset]
 	encrypted[offset]++
 	t.Logf("offset: 0x%x\n%v", offset, spew.Sdump(encrypted))
-	decrypted, version, err = Decrypt(key, encrypted)
+	_, _, err = Decrypt(key, encrypted)
 	if err != ErrCouldNotDecrypt {
 		t.Fatal(err)
 	}
@@ -88,7 +88,7 @@ func TestEncryptDecryptCorruptHeader(t *testing.T) {
 	x = encrypted[offset]
 	encrypted[offset]++
 	t.Logf("offset: 0x%x\n%v", offset, spew.Sdump(encrypted))
-	decrypted, version, err = Decrypt(key, encrypted)
+	_, _, err = Decrypt(key, encrypted)
 	if err != ErrCouldNotDecrypt {
 		t.Fatal(err)
 	}
@@ -108,14 +108,14 @@ func TestEncryptDecryptCorruptHeader(t *testing.T) {
 
 	// short header
 	size := magicLen + versionLen + nonceLen
-	decrypted, version, err = Decrypt(key, encrypted[0:size-1])
+	_, _, err = Decrypt(key, encrypted[0:size-1])
 	if err != ErrInvalidHeader {
 		t.Fatal(err)
 	}
 
 	// short data
 	size = len(encrypted)
-	decrypted, version, err = Decrypt(key, encrypted[0:size-1])
+	_, _, err = Decrypt(key, encrypted[0:size-1])
 	if err != ErrCouldNotDecrypt {
 		t.Fatal(err)
 	}
