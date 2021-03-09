@@ -97,7 +97,7 @@ func encrypt(version uint32, key *[32]byte, nonce [24]byte, data []byte) ([]byte
 	return packed, nil
 }
 
-// EncryptN encrypts data with the provided key and generates a random nonce.
+// Encrypt encrypts data with the provided key and generates a random nonce.
 // Note that it is the callers responsibility to ensure that a nonce is NEVER
 // reused with the same key.  It prefixes the encrypted blob with an sbox
 // header which encodes the provided version. The user provided version can be
