@@ -6,6 +6,8 @@ import (
 	"encoding/binary"
 	"errors"
 	"io"
+	"math/big"
+	"sync"
 
 	"golang.org/x/crypto/nacl/secretbox"
 )
@@ -28,6 +30,10 @@ var (
 
 	// ErrCouldNotDecrypt is returned when the secret box decryption fails.
 	ErrCouldNotDecrypt = errors.New("could not decrypt")
+
+	// ErrInvalidNonce is returned when a user provided nonce is of an
+	// invalid size. A user provided nonce must be 0 < N <= 24.
+	ErrInvalidNonce = errors.New("invalid nonce size")
 )
 
 // NewKey generates a new secret key for a NACL secret box. This key must not
@@ -71,21 +77,12 @@ func Decrypt(key *[32]byte, packed []byte) ([]byte, uint32, error) {
 	return decrypted, version, nil
 }
 
-// Encrypt encrypts provided data with key. It prefixes the encrypted blob with
-// an sbox header which encodes the provided version. The version user provided
-// and can be used as a hint to identify or version the packed blob. Version is
-// not inspected or used by Encrypt and Decrypt.
-func Encrypt(version uint32, key *[32]byte, data []byte) ([]byte, error) {
+// encrypt returns an encrypted blob that is prefixed with the version and
+// nonce.
+func encrypt(version uint32, key *[32]byte, nonce [24]byte, data []byte) ([]byte, error) {
 	// version
 	v := make([]byte, 4)
 	binary.BigEndian.PutUint32(v, version)
-
-	// random nonce
-	var nonce [24]byte
-	_, err := io.ReadFull(rand.Reader, nonce[:])
-	if err != nil {
-		return nil, err
-	}
 
 	// encrypt data
 	blob := secretbox.Seal(nil, data, &nonce, key)
@@ -98,4 +95,86 @@ func Encrypt(version uint32, key *[32]byte, data []byte) ([]byte, error) {
 	copy(packed[len(magic)+len(v)+len(nonce):], blob)
 
 	return packed, nil
+}
+
+// EncryptN encrypts data with the provided key and generates a random nonce.
+// Note that it is the callers responsibility to ensure that a nonce is NEVER
+// reused with the same key.  It prefixes the encrypted blob with an sbox
+// header which encodes the provided version. The user provided version can be
+// used as a hint to identify or version the packed blob. Version is not
+// inspected or used by Encrypt and Decrypt.
+func Encrypt(version uint32, key *[32]byte, data []byte) ([]byte, error) {
+	// random nonce
+	var nonce [24]byte
+	_, err := io.ReadFull(rand.Reader, nonce[:])
+	if err != nil {
+		return nil, err
+	}
+	return encrypt(version, key, nonce, data)
+}
+
+// EncryptN encrypts data with the provided key and nonce. Note that it is the
+// callers responsibility to ensure that a nonce is NEVER reused with the same
+// key. It prefixes the encrypted blob with an sbox header which encodes the
+// provided version. The user provided version can be used as a hint to
+// identify or version the packed blob. Version is not inspected or used by
+// Encrypt and Decrypt.
+func EncryptN(version uint32, key *[32]byte, nonce [24]byte, data []byte) ([]byte, error) {
+	return encrypt(version, key, nonce, data)
+}
+
+var (
+	one = big.NewInt(1)
+)
+
+// Nonce represents a valid nonce and counter that can be used as an input to
+// EncryptN. Note that the caller is responsible for ensuring that a nonce is
+// never reused with the same key.
+type Nonce struct {
+	sync.Mutex
+	n *big.Int
+}
+
+// current returns the current nonce value.
+// This functions must be called with the mutex held.
+func (n *Nonce) current() [24]byte {
+	nonce := [24]byte{}
+	copy(nonce[:], n.n.Bytes())
+	return nonce
+}
+
+// Current returns the current nonce value.
+// This functions must be called without the mutex held.
+func (n *Nonce) Current() [24]byte {
+	n.Lock()
+	defer n.Unlock()
+	return n.current()
+}
+
+// Next returns the current nonce plus one value.
+// This functions must be called without the mutex held.
+func (n *Nonce) Next() [24]byte {
+	n.Lock()
+	defer n.Unlock()
+	n.n.Add(n.n, one)
+	return n.current()
+}
+
+// NewNonce returns a nonce that is set to 0.
+func NewNonce() *Nonce {
+	return &Nonce{
+		n: new(big.Int),
+	}
+}
+
+// NewNonceFromBytes returns a nonce that is set to n.
+func NewNonceFromBytes(n []byte) (*Nonce, error) {
+	if len(n) == 0 || len(n) > 24 {
+		return nil, ErrInvalidNonce
+	}
+	x := make([]byte, 24)
+	copy(x[:], n)
+	return &Nonce{
+		n: new(big.Int).SetBytes(x),
+	}, nil
 }
